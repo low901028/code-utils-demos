@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"fmt"
 	"io"
-	"net"
 )
 
 var _Cache = (*LRUCache)(nil)
@@ -145,6 +144,18 @@ func (p *LRUCache) GetFrom(key string, getter func(key string) (v interface{} , 
 
 	return
 }
+
+// 设置
+func (p *LRUCache) Set(key string, value interface{}, size int, deleter ...func(key string, value interface{})) {
+	if len(deleter) > 0 {
+		h := p.Insert(key, value, size, deleter[0])
+		h.Close()
+	} else {
+		h := p.Insert(key, value, size, nil)
+		h.Close()
+	}
+}
+
 
 // 获取value
 // 若是cache中没有对应的value，取defaultValue第一个元素作为结果返回
