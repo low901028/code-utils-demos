@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"fmt"
 	"io"
+	"net"
 )
 
 var _Cache = (*LRUCache)(nil)
@@ -235,6 +236,155 @@ func (p *LRUCache) Lookup_(key string) (value interface{}, handle *LRUHandle, ok
 	return h.Value(), h, true
 }
 
+// 获取cache中key对应的内容 并删除双向链表和hash table中的记录
+func (p *LRUCache) Take(key string) (handle io.Closer, ok bool){
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	element := p.table[key]
+	if element == nil{
+		return nil, false
+	}
+
+	p.list.Remove(element)
+	delete(p.table, key)
+
+	h := element.Value.(*LRUHandle)
+
+	return h, true
+}
+
+
+// 功能很类似Take 额外需要release对应的key关联的handle
+func (p *LRUCache) Erase(key string){
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	element := p.table[key]
+	if element != nil{
+		return
+	}
+
+	p.list.Remove(element)
+	delete(p.table, key)
+
+	h := element.Value.(*LRUHandle)
+	p.unref(h)   // 删除key  需要release关联的handle
+
+	return
+}
+
+
+// 设置cache的capacity
+func (p *LRUCache) SetCapacity(capacity int64){
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	common.Assert(capacity > 0)
+	p.capacity = capacity
+	p.checkCapacity()  // 检查size 是否超过capacity
+
+}
+
+
+// 统计信息cache
+func (p *LRUCache) Stats() (length, size, capacity int64, oldest time.Time){
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if lastElem := p.list.Back(); lastElem != nil{
+		oldest = lastElem.Value.(*LRUHandle).time_accessed.Load().(time.Time)
+	}
+	return int64(p.list.Len()), p.size, p.capacity, oldest
+}
+// 统计信息json格式
+func (p *LRUCache) StatsJSON() string {
+	if p == nil {
+		return "{}"
+	}
+	l, s, c, o := p.Stats()
+	return fmt.Sprintf(`{
+	"Length": %v,
+	"Size": %v,
+	"Capacity": %v,
+	"OldestAccess": "%v"
+}`, l, s, c, o)
+}
+
+// cache中element的个数
+func (p *LRUCache) Length() int64{
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return int64(p.list.Len())
+}
+
+//
+func (p *LRUCache) Size() int64{
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.size
+}
+
+func (p *LRUCache) Capacity() int64{
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.capacity
+}
+
+// cache中最新element对应的时间
+// 若是cache不存在 则返回IsZero() time
+func (p *LRUCache) Newest() (newest time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if frontElem := p.list.Front(); frontElem != nil {
+		newest = frontElem.Value.(*LRUHandle).time_accessed.Load().(time.Time)
+	}
+	return
+}
+
+func (p *LRUCache) Oldest() (oldest time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if lastElem := p.list.Back(); lastElem != nil {
+		oldest = lastElem.Value.(*LRUHandle).time_accessed.Load().(time.Time)
+	}
+	return
+}
+
+
+// cache中所有的keys； 按照使用时间的最近进行排序
+func (p *LRUCache) Keys() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	keys := make([]string, 0, p.list.Len())
+	for e := p.list.Front(); e != nil; e = e.Next() {
+		keys = append(keys, e.Value.(*LRUHandle).key)
+	}
+	return keys
+}
+
+// 清除cache
+// 前提要release所有key关联的handle
+func (p *LRUCache) Clear() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for _, element := range p.table {
+		h := element.Value.(*LRUHandle)
+		p.unref(h)
+	}
+
+	p.list = list.New()
+	p.table = make(map[string]*list.Element)
+	p.size = 0
+	return
+}
+
+
 // 检查cache的size是否已经超过capacity
 // 一旦超过了 则进行收缩： 淘汰旧数据 直至size <= capacity
 func (p *LRUCache) checkCapacity() {
@@ -262,7 +412,21 @@ func (p *_LRUCache) unref(h *LRUHandle) {
 	}
 }
 
+//==========================================实现io.Closer==========================================
+func (p *_LRUCache) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
+	for _, element := range p.table {
+		h := element.Value.(*LRUHandle)
+		common.Assert(h.refs == 1, "h.refs = ", h.refs)
+		p.unref(h)
+	}
+
+	p.list = nil
+	p.table = nil
+	p.size = 0
+}
 
 
 
