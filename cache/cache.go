@@ -35,7 +35,7 @@ type Cache interface {
 	// 清理cache
 	// 通过调用“deleter”函数来清理所有exist的entry
 	// 注：必须所有handle被释放 方可完成释放
-	Close()
+	Close() error
 }
 
 // 根据指定capacity创建cache

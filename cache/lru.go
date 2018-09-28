@@ -102,7 +102,7 @@ func NewLRUCache(capacity int64) *LRUCache{
 		capacity:	capacity,
 	}
 
-	runtime.SetFinalizer(p, (*_LRUCache).Close)
+	runtime.SetFinalizer(p, (*_LRUCache).Close)  // 退出清理Cache
 	return &LRUCache{p}
 }
 
@@ -234,7 +234,7 @@ func (p *LRUCache) Lookup_(key string) (value interface{}, handle *LRUHandle, ok
 	defer p.mu.Unlock()
 
 	element := p.table[key]  // 先从二级索引hash table拿数据  若是没有也意味双向链表也没有
-	if element != nil{
+	if element == nil{
 		return nil, nil, false
 	}
 
@@ -440,6 +440,235 @@ func (p *_LRUCache) Close() {
 }
 
 
+//==========================================cache lur实现扩展==========================================
+
+// 查询二级索引hash表判断对应的key是否存在
+func (p *LRUCache) HashKey(key string) bool{
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	_, ok := p.table[key]
+	return ok
+}
+
+// 先获取双向链表表头的element 拿到关联的handle
+// 接着从handle拿到key
+func (p *LRUCache) FrontKey() (key string){
+	if h := p.Front(); h != nil{
+		key = h.Key()
+		h.Close()
+
+		return key
+	}
+	return ""
+}
+
+//同FrontKey
+func (p *LRUCache) BackKey() (key string) {
+	if h := p.Back(); h != nil {
+		key = h.Key()
+		h.Close()
+		return key
+	}
+	return ""
+}
+
+// 同FrontKey 先拿到双向链表表头element的handle
+// 不过当handle没有内容时，则可使用defaultvalues[0]作为结果
+func (p *LRUCache) FrontValue(defaultValue ...interface{}) (value interface{}) {
+	if h := p.Front(); h != nil {
+		value = h.Value()
+		h.Close()
+		return
+	}
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	} else {
+		return nil
+	}
+}
+
+// 同FrontValue
+func (p *LRUCache) BackValue(defaultValue ...interface{}) (value interface{}) {
+	if h := p.Back(); h != nil {
+		value = h.Value()
+		h.Close()
+		return
+	}
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	} else {
+		return nil
+	}
+}
+
+// 移除双向链表表头
+func (p *LRUCache) RemoveFront() {
+	if h := p.PopFront(); h != nil {
+		h.Close()
+	}
+}
+
+// 移除双向链表表尾
+func (p *LRUCache) RemoveBack() {
+	if h := p.PopBack(); h != nil {
+		h.Close()
+	}
+}
+
+// 先获取双向列表表头的element  获取到关联的handle【LRUHandle类似redis里面的redisobject】
+func (p *LRUCache) Front() (h *LRUHandle) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var element *list.Element
+	if element = p.list.Front(); element == nil {
+		return
+	}
+
+	h = element.Value.(*LRUHandle)
+	p.addref(h)   // 使用handle 一定要增加ref数
+	return
+}
+
+// 同Front
+func (p *LRUCache) Back() (h *LRUHandle) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var element *list.Element
+	if element = p.list.Back(); element == nil {
+		return
+	}
+
+	h = element.Value.(*LRUHandle)
+	p.addref(h)
+	return
+}
+
+// 将element压入到表头
+func (p *LRUCache) PushFront(key string, value interface{}, size int, deleter func(key string, value interface{})) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	common.Assert(key != "" && size > 0)
+	if element := p.table[key]; element != nil {   // 添加element已存在，则需要指定清理操作：双向链表remove  二级索引table delete
+		p.list.Remove(element)
+		delete(p.table, key)
+
+		h := element.Value.(*LRUHandle)
+		p.unref(h)
+	}
+
+	h := &LRUHandle{
+		c:            p,
+		key:          key,
+		value:        value,
+		size:         int64(size),
+		deleter:      deleter,
+		time_created: time.Now(),
+		refs:         1, // 添加element至少会产生一个ref【此处没有返回handle 故而只有一个ref】
+	}
+	h.time_accessed.Store(time.Now())
+
+	element := p.list.PushFront(h)
+	p.table[key] = element
+	p.size += h.size
+	p.checkCapacity()
+	return
+}
+
+// 同PushFront：将element压入到双向链表的表尾
+func (p *LRUCache) PushBack(key string, value interface{}, size int, deleter func(key string, value interface{})) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	common.Assert(key != "" && size > 0)
+	if element := p.table[key]; element != nil {
+		p.list.Remove(element)
+		delete(p.table, key)
+
+		h := element.Value.(*LRUHandle)
+		p.unref(h)
+	}
+
+	h := &LRUHandle{
+		c:            p,
+		key:          key,
+		value:        value,
+		size:         int64(size),
+		deleter:      deleter,
+		time_created: time.Now(),
+		refs:         1, //添加element至少会产生一个ref【此处没有返回handle 故而只有一个ref】
+	}
+	h.time_accessed.Store(time.Now())
+
+	element := p.list.PushBack(h)
+	p.table[key] = element
+	p.size += h.size
+	p.checkCapacity()
+	return
+}
+
+// 弹出双向链表尾element
+func (p *LRUCache) PopBack() (h *LRUHandle) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var element *list.Element
+	if element = p.list.Back(); element == nil {
+		return
+	}
+
+	h = element.Value.(*LRUHandle)
+	delete(p.table, h.Key())
+	p.list.Remove(element)
+	return
+}
+
+// 弹出双向链表=头element
+func (p *LRUCache) PopFront() (h *LRUHandle) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var element *list.Element
+	if element = p.list.Front(); element == nil {
+		return
+	}
+
+	h = element.Value.(*LRUHandle)
+	delete(p.table, h.Key())
+	p.list.Remove(element)
+	return
+}
+
+// 移动到双向链表表头
+func (p *LRUCache) MoveToFront(key string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	element := p.table[key]
+	if element == nil {
+		return
+	}
+
+	p.list.MoveToFront(element)
+	return
+}
+
+// 移动到双向链表表尾
+func (p *LRUCache) MoveToBack(key string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	element := p.table[key]
+	if element == nil {
+		return
+	}
+
+	p.list.MoveToBack(element)
+	return
+}
 
 
 
