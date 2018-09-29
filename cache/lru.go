@@ -272,7 +272,7 @@ func (p *LRUCache) Erase(key string){
 	defer p.mu.Unlock()
 
 	element := p.table[key]
-	if element != nil{
+	if element == nil{
 		return
 	}
 
