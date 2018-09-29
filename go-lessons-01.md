@@ -147,7 +147,9 @@ package mysqlimport (    "database/sql")func init() {
 因为我们只是想执行这个mysql包的init方法，并不想使用这个包，所以我们在导入这个包的时候，需要使用`_`重命名包名，避免编译错误。
 
 ```
-import "database/sql"import _ "github.com/go-sql-driver/mysql"db, err := sql.Open("mysql", "user:password@/dbname")
+import "database/sql"
+import _ "github.com/go-sql-driver/mysql"
+db, err := sql.Open("mysql", "user:password@/dbname")
 ```
 
 看非常简洁，剩下针对的数据库的操作，都是使用的`database/sql`标准接口，如果我们想换一个mysql的驱动的话，只需要换个导入就可以了，灵活方便，这也是面向接口编程的便利。
