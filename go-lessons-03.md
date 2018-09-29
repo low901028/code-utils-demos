@@ -55,7 +55,8 @@ func Add(a, b int) int
 
 ```
 ➜  lib go doc json
-package json // import "encoding/json"Package json implements encoding and decoding of JSON as defined in RFC4627. 
+package json // import "encoding/json"Package json implements encoding and decoding of JSON 
+as defined in RFC4627. 
 The mapping between JSON and Go values is described in the
 documentation for the Marshal and Unmarshal functions.
 
