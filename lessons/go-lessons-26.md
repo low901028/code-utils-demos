@@ -15,7 +15,8 @@ func main() {
     fmt.Println(unsafe.Sizeof(int(10000000000000000)))
 }
 ~~~
-对于整型来说，占用的字节数意味着这个类型存储数字范围的大小，比如int8占用一个字节，也就是8bit，所以它可以存储的大小范围是-128~~127,也就是−2^(n-1)到2^(n-1)−1，n表示bit，int8表示8bit，int16表示16bit，其他以此类推。
+对于整型来说，占用的字节数意味着这个类型存储数字范围的大小，比如int8占用一个字节，也就是8bit，
+所以它可以存储的大小范围是-128~~127,也就是−2^(n-1)到2^(n-1)−1，n表示bit，int8表示8bit，int16表示16bit，其他以此类推。
 
 对于和平台有关的int类型，这个要看平台是32位还是64位，会取最大的。比如我自己测试，以上输出，会发现int和int64的大小是一样的，因为我的是64位平台的电脑。
 ~~~
@@ -23,7 +24,8 @@ func Sizeof(x ArbitraryType) uintptr
 ~~~
 以上是Sizeof的函数定义，它接收一个ArbitraryType类型的参数，返回一个uintptr类型的值。这里的ArbitraryType不用关心，他只是一个占位符，为了文档的考虑导出了该类型，但是一般不会使用它，我们只需要知道它表示任何类型，也就是我们这个函数可以接收任意类型的数据。
 ~~~
-// ArbitraryType is here for the purposes of documentation only and is not actually// part of the unsafe package. It represents the type of an arbitrary Go expression.
+// ArbitraryType is here for the purposes of documentation only and is not actually
+// part of the unsafe package. It represents the type of an arbitrary Go expression.
 type ArbitraryType int
 Alignof 函数
 ~~~
@@ -158,12 +160,13 @@ struct的字段顺序影响struct的大小
 
 在分析之前，我们先看下内存对齐的规则：
 
-对于具体类型来说，对齐值=min(编译器默认对齐值，类型大小Sizeof长度)。也就是在默认设置的对齐值和类型的内存占用大小之间，取最小值为该类型的对齐值。我的电脑默认是8，所以最大值不会超过8.
+> 对于具体类型来说，对齐值=min(编译器默认对齐值，类型大小Sizeof长度)。也就是在默认设置的对齐值和类型的内存占用大小之间，取最小值为该类型的对齐值。我的电脑默认是8，所以最大值不会超过8.
 struct在每个字段都内存对齐之后，其本身也要进行对齐，对齐值=min(默认对齐值，字段最大类型长度)。这条也很好理解，struct的所有字段中，最大的那个类型的长度以及默认对齐值之间，取最小的那个。
 以上这两条规则要好好理解，理解明白了才可以分析下面的struct结构体。在这里再次提醒，对齐值也叫对齐系数、对齐倍数，对齐模数。这就是说，每个字段在内存中的偏移量是对齐值的倍数即可。
 
 我们知道byte，int32，int64的对齐值分别为1，4，8，占用内存大小也是1，4，8。那么对于第一个structuser1，它的字段顺序是byte、int32、int64，我们先使用第1条内存对齐规则进行内存对齐，其内存结构如下，内存布局中有竖线(|),用于每四个字节的分割，下同。
 
+##### user1
 bxxx|iiii|jjjj|jjjj
 - user1类型，第1个字段byte，对齐值1，大小1，所以放在内存布局中的第1位。
 
@@ -175,6 +178,7 @@ bxxx|iiii|jjjj|jjjj
 
 所以到此为止，结构体user1的内存占用大小为16字节。
 
+##### user2
 现在我们再分析一个user2类型，它的大小是24，只是调换了一下字段i和j的顺序，就多占用了8个字节，我们看看为什么？还是先使用我们的内存第1条规则分析。
 
 bxxx|xxxx|jjjj|jjjj|iiii
@@ -192,8 +196,7 @@ bxxx|xxxx|jjjj|jjjj|iiii|xxxx
 所以这也是为什么我们最终获得的user2的大小为24的原因。
 基于以上办法，我们可以得出其他几个struct的内存布局。
 
-user3
-
+##### user3
 iiii|bxxx|jjjj|jjjj
 user4
 
