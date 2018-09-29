@@ -88,7 +88,12 @@ go build flysnow.org/tools/...
 
 ```
 ➜  ~ go env
-GOARCH="amd64"GOEXE=""GOHOSTARCH="amd64"GOHOSTOS="darwin"GOOS="darwin"GOROOT="/usr/local/go"GOTOOLDIR="/usr/local/go/pkg/tool/darwin_amd64"
+GOARCH="amd64"
+GOEXE=""
+GOHOSTARCH="amd64"
+GOHOSTOS="darwin"
+GOOS="darwin"
+GOROOT="/usr/local/go"GOTOOLDIR="/usr/local/go/pkg/tool/darwin_amd64"
 ```
 
 注意里面两个重要的环境变量GOOS和GOARCH,其中GOOS指的是目标操作系统，它的可用值为：
@@ -176,7 +181,8 @@ By default, 'go run' runs the compiled binary directly: 'a.out arguments...'.
 If the -exec flag is given, 'go run' invokes the binary using xprog:    'xprog a.out arguments...'.
 If the -exec flag is not given, GOOS or GOARCH is different from the system
 default, and a program named go_$GOOS_$GOARCH_exec can be found
-on the current search path, 'go run' invokes the binary using that program,for example 'go_nacl_386_exec a.out arguments...'. This allows execution of
+on the current search path, 'go run' invokes the binary using that program,
+for example 'go_nacl_386_exec a.out arguments...'. This allows execution of
 cross-compiled programs when a simulator or other execution method is
 available.
 
