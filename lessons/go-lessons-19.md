@@ -161,16 +161,22 @@ func Fprint(w io.Writer, a ...interface{}) (n int, err error) {
 
 ```
 func readAll(r io.Reader, capacity int64) (b []byte, err error) {
-    buf := bytes.NewBuffer(make([]byte, 0, capacity))    // If the buffer overflows, we will get bytes.ErrTooLarge.
+    buf := bytes.NewBuffer(make([]byte, 0, capacity))    
+    // If the buffer overflows, we will get bytes.ErrTooLarge.
     // Return that as an error. Any other panic remains.
     defer func() {
-        e := recover()                if e == nil {                    return
-        }               if panicErr, ok := e.(error); ok && panicErr == bytes.ErrTooLarge {
+        e := recover()                
+        if e == nil {                    
+          return
+        }               
+        if panicErr, ok := e.(error); ok && panicErr == bytes.ErrTooLarge {
                    err = panicErr
-        } else {                    panic(e)
+        } else {                    
+                  panic(e)
         }
     }()
-    _, err = buf.ReadFrom(r)    return buf.Bytes(), err
+    _, err = buf.ReadFrom(r)    
+    return buf.Bytes(), err
 }
 ```
 
