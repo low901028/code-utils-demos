@@ -44,11 +44,11 @@ func main() {
        for {                        
           select {                                    
                 case <-stop:                                           
-                         fmt.Println("监控退出，停止了...")                                                            
-                        return                                    
+                      fmt.Println("监控退出，停止了...")                                                            
+                       return                                    
                  default:
-                         fmt.Println("goroutine监控中...")
-                         time.Sleep(2 * time.Second)                         
+                       fmt.Println("goroutine监控中...")
+                       time.Sleep(2 * time.Second)                         
                     }               
              }
      }()
@@ -126,18 +126,16 @@ func watch(ctx context.Context, name string) {    
       for {                
             select {                    
                       case <-ctx.Done():
-                              fmt.Println(name,"监控退出，停止了...")                        
-                              return
+                           fmt.Println(name,"监控退出，停止了...")                        
+                           return
                      default:
-                             fmt.Println(name,"goroutine监控中...")
-                             time.Sleep(2 * time.Second)
+                           fmt.Println(name,"goroutine监控中...")
+                           time.Sleep(2 * time.Second)
                   }
           }
 }
 ```
 示例中启动了3个监控goroutine进行不断的监控，每一个都使用了Context进行跟踪，当我们使用`cancel`函数通知取消时，这3个goroutine都会被结束。这就是Context的控制能力，它就像一个控制器一样，按下开关后，所有基于这个Context或者衍生的子Context都会收到通知，这时就可以进行清理操作了，最终释放goroutine，这就优雅的解决了goroutine启动后不可控的问题。
-
-> 《Go语言实战》读书笔记，未完待续，欢迎扫码关注公众号`flysnow_org`或者网站http://www.flysnow.org/，第一时间看后续笔记。觉得有帮助的话，顺手分享到朋友圈吧，感谢支持。
 
 ## Context接口
 Context的接口定义的比较简洁，我们看下这个接口的方法。
