@@ -1,0 +1,79 @@
+package main
+
+import (
+	"GoDemo/cache-go"
+	"time"
+	"fmt"
+	"strconv"
+)
+
+type myStruct struct {
+	text		string
+	moreData 	[]byte
+}
+
+func main() {
+	cache := cache_go.Cache("myCache")
+
+	val := myStruct{
+		text: "This is a test!",
+		moreData: []byte{},
+	}
+
+	cache.Add("some-key", 5 * time.Second, &val)
+
+	// test
+	res, err := cache.Value("some-key")
+	if err == nil {
+		fmt.Println("Found value in cache:", res.Data().(*myStruct).text)
+	} else {
+		fmt.Println("Error retrieving value from cache:", err)
+	}
+
+	// 验证key的有效期
+	time.Sleep(6 * time.Second)
+	res , err = cache.Value("some-key")
+	if err != nil{
+		fmt.Println("Item is not cached(any more!)")
+	}
+
+	// 添加
+	cache.Add("some-key", 0, &val)
+
+	// 指定删除的后续操作
+	cache.SetAboutToDeleteItemCallback(func(e *cache_go.CacheItem) {
+		fmt.Println("Deleting:", e.Key(), e.Data().(*myStruct).text, e.CreatedOn())
+	})
+
+	// 删除指定的key
+	cache.Delete("some-key")
+
+
+	// 验证loader data
+	cache.SetDataLoader(func(key interface{}, args ...interface{}) *cache_go.CacheItem {
+		val := "This is a test with key " + key.(string)
+
+		item := cache_go.NewCacheItem(key, 0, val)
+		return item
+	})
+
+	for i := 0; i < 10; i++{
+		res, err := cache.Value("some-key-"+strconv.Itoa(i))
+		if err == nil {
+			fmt.Println("Found value in cache:", res.Data())
+		} else {
+			fmt.Println("Error retrieving value from cache:", err)
+		}
+	}
+
+	//cache.SetAddedItemCallback(func(entry *cache_go.CacheItem) {
+	//	fmt.Println("Added:", entry.Key(), entry.Data(), entry.CreatedOn())
+	//})
+	//
+	//cache.SetAboutToDeleteItemCallback(func(entry *cache_go.CacheItem) {
+	//	fmt.Println("Deleting:", entry.Key(), entry.Data(), entry.CreatedOn())
+	//})
+	
+	// 清空所有items
+	cache.Flush()
+}
